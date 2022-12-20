@@ -56,7 +56,68 @@ def dumb_heuristic2(state, agent_id):
 
 
 def smart_heuristic(state, agent_id):
-    return
+    rows_count1 = np.array([0, 0, 0])
+    columns_count1 = np.array([0, 0, 0])
+    diagonals_count1 = np.array([0, 0, 0])
+    sum_two_together_1 = 0
+    rows_count2 = np.array([0, 0, 0])
+    columns_count2 = np.array([0, 0, 0])
+    diagonals_count2 = np.array([0, 0, 0])
+    sum_two_together_2 = 0
+    for key, value in state.player1_pawns.items():
+        if not np.array_equal(value[0], not_on_board) and not is_hidden(state, 0, key):
+            row = value[0][0]
+            column = value[0][1]
+            rows_count1[row] += 1
+            columns_count1[column] += 1
+            if row == column:
+                diagonals_count1[0] += 1
+            if row + column == 2:
+                diagonals_count1[1] += 1
+    for key, value in state.player2_pawns.items():
+        if not np.array_equal(value[0], not_on_board) and not is_hidden(state, 1, key):
+            row = value[0][0]
+            column = value[0][1]
+            rows_count2[row] += 1
+            columns_count2[column] += 1
+            if row == column:
+                diagonals_count2[0] += 1
+            if row + column == 2:
+                diagonals_count2[1] += 1
+    
+    is_final = gge.is_final_state(state)
+    if is_final is not None:
+        if is_final == 0:
+            return 0
+        winner = int(is_final) - 1
+        if winner == agent_id:
+            return 10
+        else:
+            return -10
+                
+    for row in rows_count1:
+        if row == 2:
+            sum_two_together_1 += 1
+    for column in columns_count1:
+        if column == 2:
+            sum_two_together_1 += 1
+    for diagonal in diagonals_count1:
+        if diagonal == 2:
+            sum_two_together_1 += 1
+            
+    for row in rows_count2:
+        if row == 2:
+            sum_two_together_2 += 1
+    for column in columns_count2:
+        if column == 2:
+            sum_two_together_2 += 1
+    for diagonal in diagonals_count2:
+        if diagonal == 2:
+            sum_two_together_2 += 1
+
+    if agent_id == 0:
+        return sum_two_together_1 - sum_two_together_2
+    return sum_two_together_2 - sum_two_together_1
 
 
 # IMPLEMENTED FOR YOU - NO NEED TO CHANGE
@@ -93,9 +154,16 @@ def greedy(curr_state, agent_id, time_limit):
     return max_neighbor[0]
 
 
-# TODO - add your code here
 def greedy_improved(curr_state, agent_id, time_limit):
-    raise NotImplementedError()
+    neighbor_list = curr_state.get_neighbors()
+    max_heuristic = -10
+    max_neighbor = None
+    for neighbor in neighbor_list:
+        curr_heuristic = smart_heuristic(neighbor[1], agent_id)
+        if curr_heuristic >= max_heuristic:
+            max_heuristic = curr_heuristic
+            max_neighbor = neighbor
+    return max_neighbor[0]
 
 
 def rb_heuristic_min_max(curr_state, agent_id, time_limit):
