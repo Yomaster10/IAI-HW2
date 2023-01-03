@@ -166,8 +166,60 @@ def greedy_improved(curr_state, agent_id, time_limit):
     return max_neighbor[0]
 
 
+class Node:
+    def __init__(self):
+        self.parent = None
+        self.sons = []
+        self.value = None
+        self.depth = None
+        self.state = None
+        self.action = None
+
+
+def update_values(node):
+    if node.parent is not None: #not root
+        if (node.parent.depth%2 == 0) and (node.value > node.parent.value):
+            node.parent.value = node.value
+            update_values(node.parent)
+        elif (node.parent.depth%2 == 1) and (node.value < node.parent.value):
+            node.parent.value = node.value
+            update_values(node.parent)
+
+
 def rb_heuristic_min_max(curr_state, agent_id, time_limit):
-    raise NotImplementedError()
+    start_time = time.time()
+    root = Node()
+    root.depth = 0
+    root.state = curr_state
+    root.value = float('-inf')
+    nodes = [root]
+    while (time.time() - start_time < (time_limit * 0.95)) and (len(nodes) > 0):
+        curr_node = nodes.pop(0)
+        curr_node.value = smart_heuristic(curr_node.state, agent_id)
+        update_values(curr_node)
+
+        if not gge.is_final_state(curr_node.state):
+            neighbor_list = curr_node.state.get_neighbors()
+            for neighbor in neighbor_list:
+                new_node = Node()
+                new_node.depth = curr_node.depth + 1
+                new_node.parent = curr_node
+                new_node.state = neighbor[1]
+                new_node.action = neighbor[0]
+                if new_node.depth%2 == 0:
+                    new_node.value = float('-inf')
+                else:
+                    new_node.value = float('inf')
+                curr_node.sons.append(new_node)
+                nodes.append(new_node)
+    
+    max_value = float('-inf')
+    max_action = None
+    for son in root.sons:
+        if son.value > max_value:
+            max_value = son.value
+            max_action = son.action
+    return max_action
 
 
 def alpha_beta(curr_state, agent_id, time_limit):
