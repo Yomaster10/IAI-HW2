@@ -166,7 +166,7 @@ def greedy_improved(curr_state, agent_id, time_limit):
     return max_neighbor[0]
 
 
-class Node:
+class MinMaxNode:
     def __init__(self):
         self.parent = None
         self.sons = []
@@ -177,18 +177,25 @@ class Node:
 
 
 def update_values(node):
-    if node.parent is not None: #not root
-        if (node.parent.depth%2 == 0) and (node.value > node.parent.value):
-            node.parent.value = node.value
-            update_values(node.parent)
-        elif (node.parent.depth%2 == 1) and (node.value < node.parent.value):
-            node.parent.value = node.value
-            update_values(node.parent)
-
+    if len(node.sons) != 0:
+        if node.depth%2 == 0:
+            value = float('-inf')
+            for son in node.sons:
+                update_values(son)
+                if son.value > value:
+                    value = son.value
+                    node.value = value
+        else:
+            value = float('inf')
+            for son in node.sons:
+                update_values(son)
+                if son.value < value:
+                    value = son.value
+                    node.value = value
 
 def rb_heuristic_min_max(curr_state, agent_id, time_limit):
     start_time = time.time()
-    root = Node()
+    root = MinMaxNode()
     root.depth = 0
     root.state = curr_state
     root.value = float('-inf')
@@ -196,12 +203,10 @@ def rb_heuristic_min_max(curr_state, agent_id, time_limit):
     while (time.time() - start_time < (time_limit * 0.95)) and (len(nodes) > 0):
         curr_node = nodes.pop(0)
         curr_node.value = smart_heuristic(curr_node.state, agent_id)
-        update_values(curr_node)
-
         if not gge.is_final_state(curr_node.state):
             neighbor_list = curr_node.state.get_neighbors()
             for neighbor in neighbor_list:
-                new_node = Node()
+                new_node = MinMaxNode()
                 new_node.depth = curr_node.depth + 1
                 new_node.parent = curr_node
                 new_node.state = neighbor[1]
@@ -212,7 +217,7 @@ def rb_heuristic_min_max(curr_state, agent_id, time_limit):
                     new_node.value = float('inf')
                 curr_node.sons.append(new_node)
                 nodes.append(new_node)
-    
+    update_values(root)
     max_value = float('-inf')
     max_action = None
     for son in root.sons:
@@ -222,8 +227,72 @@ def rb_heuristic_min_max(curr_state, agent_id, time_limit):
     return max_action
 
 
+class AlphaBetaNode:
+    def __init__(self):
+        self.parent = None
+        self.sons = []
+        self.value = None
+        self.depth = None
+        self.state = None
+        self.action = None
+        self.alpha = float('-inf')
+        self.beta = float('inf')
+
+
+def update_values_alpha_beta(node, alpha, beta):
+    if len(node.sons) != 0:
+        if node.depth%2 == 0:
+            for son in node.sons:
+                node.value = max(node.value, update_values_alpha_beta(son, node.alpha, node.beta))
+                if (node.value >= node.beta):
+                    return node.value
+                node.alpha = max(node.alpha, node.value)
+            return node.value
+        else:
+            for son in node.sons:
+                node.value = min(node.value, update_values_alpha_beta(son, node.alpha, node.beta))
+                if (node.value <= node.alpha):
+                    return node.value
+                node.beta = min(node.beta, node.value)
+            return node.value
+    return node.value
+
+
 def alpha_beta(curr_state, agent_id, time_limit):
-    raise NotImplementedError()
+    start_time = time.time()
+    root = AlphaBetaNode()
+    root.depth = 0
+    root.state = curr_state
+    root.value = float('-inf')
+    nodes = [root]
+    while (time.time() - start_time < (time_limit * 0.95)) and (len(nodes) > 0):
+        curr_node = nodes.pop(0)
+        curr_node.value = smart_heuristic(curr_node.state, agent_id)
+
+        if not gge.is_final_state(curr_node.state):
+            neighbor_list = curr_node.state.get_neighbors()
+            for neighbor in neighbor_list:
+                new_node = AlphaBetaNode()
+                new_node.depth = curr_node.depth + 1
+                new_node.parent = curr_node
+                new_node.state = neighbor[1]
+                new_node.action = neighbor[0]
+                new_node.alpha = curr_node.alpha
+                new_node.beta = curr_node.beta
+                if new_node.depth%2 == 0:
+                    new_node.value = float('-inf')
+                else:
+                    new_node.value = float('inf')
+                curr_node.sons.append(new_node)
+                nodes.append(new_node)
+    update_values_alpha_beta(root, root.alpha, root.beta)
+    max_value = float('-inf')
+    max_action = None
+    for son in root.sons:
+        if son.value > max_value:
+            max_value = son.value
+            max_action = son.action
+    return max_action
 
 
 def expectimax(curr_state, agent_id, time_limit):
