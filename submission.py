@@ -1,11 +1,8 @@
-import random
-
+import random, time
 import numpy as np
-
 import Gobblet_Gobblers_Env as gge
 
 not_on_board = np.array([-1, -1])
-
 
 # agent_id is which player I am, 0 - for the first player , 1 - if second player
 def dumb_heuristic1(state, agent_id):
@@ -27,7 +24,6 @@ def dumb_heuristic1(state, agent_id):
         # if other player won
         return -1
 
-
 # checks if a pawn is under another pawn
 def is_hidden(state, agent_id, pawn):
     pawn_location = gge.find_curr_location(state, pawn, agent_id)
@@ -38,7 +34,6 @@ def is_hidden(state, agent_id, pawn):
         if np.array_equal(value[0], pawn_location) and gge.size_cmp(value[1], state.player1_pawns[pawn][1]) == 1:
             return True
     return False
-
 
 # count the numbers of pawns that i have that aren't hidden
 def dumb_heuristic2(state, agent_id):
@@ -53,7 +48,6 @@ def dumb_heuristic2(state, agent_id):
                 sum_pawns += 1
 
     return sum_pawns
-
 
 def smart_heuristic(state, agent_id):
     rows_count1 = np.array([0, 0, 0])
@@ -119,7 +113,6 @@ def smart_heuristic(state, agent_id):
         return sum_two_together_1 - sum_two_together_2
     return sum_two_together_2 - sum_two_together_1
 
-
 # IMPLEMENTED FOR YOU - NO NEED TO CHANGE
 def human_agent(curr_state, agent_id, time_limit):
     print("insert action")
@@ -133,13 +126,11 @@ def human_agent(curr_state, agent_id, time_limit):
         return None
     return pawn, location
 
-
 # agent_id is which agent you are - first player or second player
 def random_agent(curr_state, agent_id, time_limit):
     neighbor_list = curr_state.get_neighbors()
     rnd = random.randint(0, neighbor_list.__len__() - 1)
     return neighbor_list[rnd][0]
-
 
 # TODO - instead of action to return check how to raise not_implemented
 def greedy(curr_state, agent_id, time_limit):
@@ -153,7 +144,6 @@ def greedy(curr_state, agent_id, time_limit):
             max_neighbor = neighbor
     return max_neighbor[0]
 
-
 def greedy_improved(curr_state, agent_id, time_limit):
     neighbor_list = curr_state.get_neighbors()
     max_heuristic = -10
@@ -165,7 +155,6 @@ def greedy_improved(curr_state, agent_id, time_limit):
             max_neighbor = neighbor
     return max_neighbor[0]
 
-
 class MinMaxNode:
     def __init__(self):
         self.parent = None
@@ -174,7 +163,6 @@ class MinMaxNode:
         self.depth = None
         self.state = None
         self.action = None
-
 
 def update_values(node):
     if len(node.sons) != 0:
@@ -226,7 +214,6 @@ def rb_heuristic_min_max(curr_state, agent_id, time_limit):
             max_action = son.action
     return max_action
 
-
 class AlphaBetaNode:
     def __init__(self):
         self.parent = None
@@ -238,10 +225,9 @@ class AlphaBetaNode:
         self.alpha = float('-inf')
         self.beta = float('inf')
 
-
 def update_values_alpha_beta(node, alpha, beta):
     if len(node.sons) != 0:
-        if node.depth%2 == 0:
+        if node.depth %2 == 0:
             for son in node.sons:
                 node.value = max(node.value, update_values_alpha_beta(son, node.alpha, node.beta))
                 if (node.value >= node.beta):
@@ -257,7 +243,6 @@ def update_values_alpha_beta(node, alpha, beta):
             return node.value
     return node.value
 
-
 def alpha_beta(curr_state, agent_id, time_limit):
     start_time = time.time()
     root = AlphaBetaNode()
@@ -268,7 +253,6 @@ def alpha_beta(curr_state, agent_id, time_limit):
     while (time.time() - start_time < (time_limit * 0.95)) and (len(nodes) > 0):
         curr_node = nodes.pop(0)
         curr_node.value = smart_heuristic(curr_node.state, agent_id)
-
         if not gge.is_final_state(curr_node.state):
             neighbor_list = curr_node.state.get_neighbors()
             for neighbor in neighbor_list:
@@ -294,10 +278,144 @@ def alpha_beta(curr_state, agent_id, time_limit):
             max_action = son.action
     return max_action
 
+class ExpectimaxNode:
+    def __init__(self):
+        self.parent = None
+        self.sons = []
+        self.value = None
+        self.depth = None
+        self.state = None
+        self.action = None
 
 def expectimax(curr_state, agent_id, time_limit):
-    raise NotImplementedError()
+    start_time = time.time()
+    root = ExpectimaxNode()
+    root.depth = 0
+    root.state = curr_state
+    root.value = float('-inf')
+    nodes = [root]
+    while (time.time() - start_time < time_limit * 0.95) and (len(nodes) > 0):
+        curr_node = nodes.pop(0)
+        curr_node.value = smart_heuristic(curr_node.state, agent_id)
+        if not gge.is_final_state(curr_node.state):
+            neighbor_list = curr_node.state.get_neighbors()
+            for neighbor in neighbor_list:
+                new_node = ExpectimaxNode()
+                new_node.depth = curr_node.depth + 1
+                new_node.parent = curr_node
+                new_node.state = neighbor[1]
+                new_node.action = neighbor[0]
+                if new_node.depth %2 == 0:
+                    new_node.value = float('-inf')
+                else:
+                    new_node.value = float('inf')
+                curr_node.sons.append(new_node)
+                nodes.append(new_node)           
+    update_values_expectimax(root, agent_id, start_time, time_limit)
+    # this part onward requires very little time
+    max_value = float('-inf')
+    max_action = None
+    for son in root.sons:
+        if son.value > max_value:
+            max_value = son.value
+            max_action = son.action
+    return max_action
+
+def update_values_expectimax(node, agent_id, start_time, time_limit, cushion=1):
+    if (time.time() - start_time < time_limit - cushion) and (len(node.sons) > 0):
+        if node.depth % 2 == 0: #maxizimer
+            value = float('-inf')
+            for son in node.sons:
+                update_values_expectimax(son, agent_id, start_time, time_limit)
+                if son.value > value:
+                    value = son.value
+                    node.value = value
+            return node.value
+        else: #chance node
+            # Assigning probabilities for each child node
+            probs = []
+            for son in node.sons:
+                p = prob(son, node, agent_id, mode="improved")
+                probs.append(p)
+            probs = probs / np.linalg.norm(probs) # normalization to [0,1]
+            
+            # Calculating the expected utility of the node
+            expected_value = 0.0
+            for idx, son in enumerate(node.sons):
+                update_values_expectimax(son, agent_id, start_time, time_limit)
+                #print(probs[idx], son.value)
+                if son.value != float('-inf'):
+                    expected_value += probs[idx] * son.value
+            node.value = expected_value
+           
+def prob(son, father, agent_id, mode="random"):
+    if mode == "random":
+        p = 1/len(father.sons)
+    elif mode == "improved":
+        """
+        (a) Actions where another soldier can eat have a 2x higher probability than other actions
+        (b) He prefers small soldiers (of size S) and therefore an action involving player S also
+        has a 2x higher probability than the other actions
+        """
+        agent_pieces_f = []; opp_pieces_f = []
+        agent_pieces_s = []; opp_pieces_s = []
+        # Record locations of all pieces (for the agent and its opponent) before and after the move 
+        if agent_id == 0:
+            for idx, val in father.state.player1_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(father.state, agent_id, idx):
+                    agent_pieces_f.append((val[0][0], val[0][1], val[1]))
+            for idx, val in father.state.player2_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(father.state, agent_id+1, idx):
+                    opp_pieces_f.append((val[0][0], val[0][1], val[1]))
+            for idx, val in son.state.player1_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(son.state, agent_id, idx):
+                    agent_pieces_s.append((val[0][0], val[0][1], val[1]))
+            for idx, val in son.state.player2_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(son.state, agent_id+1, idx):
+                    opp_pieces_s.append((val[0][0], val[0][1], val[1]))
+        elif agent_id == 1:
+            for idx, val in father.state.player2_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(father.state, agent_id, idx):
+                    agent_pieces_f.append((val[0][0], val[0][1], val[1]))
+            for idx, val in father.state.player1_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(father.state, agent_id-1, idx):
+                    opp_pieces_f.append((val[0][0], val[0][1], val[1]))
+            for idx, val in son.state.player2_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(son.state, agent_id, idx):
+                    agent_pieces_s.append((val[0][0], val[0][1], val[1]))
+            for idx, val in son.state.player1_pawns.items():
+                if not np.array_equal(val[0], not_on_board) and not is_hidden(son.state, agent_id-1, idx):
+                    opp_pieces_s.append((val[0][0], val[0][1], val[1]))
+
+        p = 1 # assign all non-special cases with a default prob. of 1 (we will normalize later)
+
+        # Checking if agent's move captures an opponent piece
+        for piece in opp_pieces_f:
+            if piece not in opp_pieces_s:
+                return 2
+
+        # Checking if agent's move involves a small piece
+        small = False
+        for piece in agent_pieces_s:
+            if piece[2] != 'S':
+                continue
+            #if piece[2] == 'S':
+            if piece not in agent_pieces_f:
+                p = 2
+                small = True
+                break
+        # Checking that the small piece was actually moved, not just uncovered
+        if small:
+            for piece in agent_pieces_s:
+                if piece[2] == 'S':
+                    continue
+                if piece not in agent_pieces_f:
+                    return 1
+    else:
+        print("Invalid probability mode requested!")
+        pass
+    return p
 
 # these is the BONUS - not mandatory
 def super_agent(curr_state, agent_id, time_limit):
-    raise NotImplementedError()
+    alpha_beta(curr_state, agent_id, time_limit)
