@@ -1,0 +1,11 @@
+id: 205488679-211870241
+partA: 4
+partB: 15
+partC dry: 12
+partC wet: 8
+partD dry: 9
+partD wet: 10
+partE dry: 10
+partE wet: 10
+partF: 21
+total: 99
